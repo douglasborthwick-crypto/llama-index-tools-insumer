@@ -35,6 +35,11 @@ class InsumerToolSpec(BaseToolSpec):
     - ``get_jwks``: fetch the JSON Web Key Set used to verify ECDSA signatures
       on attestation and trust responses. No API key required. Enables offline
       verification.
+    - ``buy_api_key``: let an agent purchase its own new API key on-chain with
+      USDC or BTC, no human in the loop. Wallet address is the identity; no
+      email required.
+    - ``buy_credits``: top up credits on an existing API key with a USDC or
+      BTC payment, no out-of-band billing.
     """
 
     spec_functions = [
@@ -42,6 +47,8 @@ class InsumerToolSpec(BaseToolSpec):
         "get_trust_profile",
         "list_compliance_templates",
         "get_jwks",
+        "buy_api_key",
+        "buy_credits",
     ]
 
     def __init__(
@@ -322,3 +329,142 @@ class InsumerToolSpec(BaseToolSpec):
         )
         response.raise_for_status()
         return response.json()
+
+    def buy_api_key(
+        self,
+        tx_hash: str,
+        chain_id: Any,
+        app_name: str,
+        amount: Optional[float] = None,
+        channel: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Buy a new API key on-chain with USDC or BTC. Agent-friendly: the
+        sender wallet address of the transaction becomes the registered
+        identity on the new key. No email, no human signup flow.
+
+        Pre-requisite: the agent must have already broadcast a USDC or BTC
+        transfer to the platform wallet BEFORE calling this method. The
+        transaction hash is then submitted here for on-chain verification.
+
+        One key per wallet — if the sending wallet already has a self-serve
+        key, the API returns 409 and asks you to top up the existing key
+        with ``buy_credits`` instead.
+
+        Keys from this endpoint have a 30-day expiry and tier ``paid``.
+
+        Args:
+            tx_hash: Transaction hash of the USDC or BTC transfer to the
+                platform wallet. Must not have been used before.
+            chain_id: Either an EVM chain ID (int, e.g. 1, 8453, 10) for USDC
+                transfers, the string ``"solana"`` for USDC on Solana, or the
+                string ``"bitcoin"`` for BTC.
+            app_name: Human-readable name for the key (max 100 chars).
+            amount: USDC amount paid (required for all USDC chains). Not
+                required for Bitcoin — the USD value is derived from the
+                on-chain BTC amount and a price feed.
+            channel: Optional tracking tag for the purchase channel.
+
+        Returns:
+            API response envelope with the newly issued raw API key:
+
+            .. code-block:: python
+
+                {
+                    "ok": True,
+                    "data": {
+                        "success": True,
+                        "key": "insr_live_...",           # the raw key — show once
+                        "name": str,
+                        "tier": "paid",
+                        "dailyLimit": 10000,
+                        "creditsAdded": int,
+                        "totalCredits": int,
+                        "effectiveRate": "$0.04/credit",
+                        "chainName": str,
+                        "registeredWallet": "0x...",
+                        "expiresAt": ISO8601,              # +30 days
+                        # Bitcoin only:
+                        "btcPaid": float, "btcPrice": float, "usdEquivalent": float,
+                        # USDC only:
+                        "usdcPaid": float,
+                    },
+                    "meta": {...},
+                }
+        """
+        body: Dict[str, Any] = {
+            "txHash": tx_hash,
+            "chainId": chain_id,
+            "appName": app_name,
+        }
+        if amount is not None:
+            body["amount"] = amount
+        if channel:
+            body["channel"] = channel
+        # This endpoint is public (no auth) — the transaction sender wallet
+        # is the identity.
+        response = requests.post(
+            f"{self.base_url}/v1/keys/buy",
+            json=body,
+            headers={"Content-Type": "application/json"},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def buy_credits(
+        self,
+        tx_hash: str,
+        chain_id: Any,
+        amount: Optional[float] = None,
+        update_wallet: bool = False,
+    ) -> Dict[str, Any]:
+        """Top up attestation credits on an existing API key with a USDC or
+        BTC payment. Requires the API key the tool spec was initialized with.
+
+        Pre-requisite: the agent or operator must have already broadcast a
+        USDC or BTC transfer to the platform wallet BEFORE calling this
+        method.
+
+        Args:
+            tx_hash: Transaction hash of the USDC or BTC transfer to the
+                platform wallet. Must not have been used before.
+            chain_id: Either an EVM chain ID (int) for USDC transfers, the
+                string ``"solana"`` for USDC on Solana, or the string
+                ``"bitcoin"`` for BTC.
+            amount: USDC amount paid (required for USDC chains). Not required
+                for Bitcoin — USD value is derived from the on-chain BTC
+                amount and a price feed.
+            update_wallet: If the transaction sender differs from the wallet
+                currently registered on this API key, set to ``True`` to
+                rebind the registered wallet to the new sender. Defaults to
+                ``False``, which rejects mismatched senders with a 403.
+
+        Returns:
+            API response envelope:
+
+            .. code-block:: python
+
+                {
+                    "ok": True,
+                    "data": {
+                        "creditsAdded": int,
+                        "totalCredits": int,
+                        "effectiveRate": "$0.04/credit",
+                        "chainName": str,
+                        # USDC chains:
+                        "usdcPaid": float,
+                        # Bitcoin:
+                        "btcPaid": float, "btcPrice": float, "usdEquivalent": float,
+                    },
+                    "meta": {...},
+                }
+        """
+        body: Dict[str, Any] = {
+            "txHash": tx_hash,
+            "chainId": chain_id,
+        }
+        if amount is not None:
+            body["amount"] = amount
+        if update_wallet:
+            body["updateWallet"] = True
+        return self._post("/v1/credits/buy", body)

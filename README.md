@@ -134,6 +134,37 @@ jwks = insumer.get_jwks()
 # }
 ```
 
+### `buy_api_key`
+
+Agentic commerce: let an agent purchase its own new API key on-chain with USDC or BTC. The transaction sender wallet becomes the registered identity. No email, no signup flow, no human in the loop. No API key required to call — the payment *is* the auth.
+
+Pre-requisite: broadcast a USDC or BTC transfer to the platform wallet first, then submit the transaction hash here.
+
+```python
+# After the agent broadcasts a 100 USDC transfer on Base to the platform wallet:
+result = InsumerToolSpec().buy_api_key(
+    tx_hash="0xabc...",
+    chain_id=8453,            # Base; use "solana" or "bitcoin" for those chains
+    app_name="my-agent",
+    amount=100.0,              # USDC amount; not required for Bitcoin
+)
+new_key = result["data"]["key"]   # insr_live_... — shown once, save it
+```
+
+One key per wallet — if the sending wallet already has a self-serve key, the API returns 409 and asks you to top up the existing key via `buy_credits` instead.
+
+### `buy_credits`
+
+Top up credits on an existing API key (the one you passed to `InsumerToolSpec`) with a USDC or BTC payment. Same pattern: broadcast the transfer, submit the `tx_hash`.
+
+```python
+insumer.buy_credits(
+    tx_hash="0xdef...",
+    chain_id=8453,
+    amount=100.0,
+)
+```
+
 ## Supported chains
 
 33 total:

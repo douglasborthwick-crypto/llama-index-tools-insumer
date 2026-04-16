@@ -35,6 +35,8 @@ def test_spec_functions_exported(spec: InsumerToolSpec) -> None:
         "get_trust_profile",
         "list_compliance_templates",
         "get_jwks",
+        "buy_api_key",
+        "buy_credits",
     ]
 
 
@@ -286,11 +288,145 @@ def test_custom_base_url() -> None:
 def test_to_tool_list_integration(spec: InsumerToolSpec) -> None:
     """Verifies BaseToolSpec --> FunctionTool conversion works."""
     tools = spec.to_tool_list()
-    assert len(tools) == 4
+    assert len(tools) == 6
     tool_names = {t.metadata.name for t in tools}
     assert tool_names == {
         "attest_wallet",
         "get_trust_profile",
         "list_compliance_templates",
         "get_jwks",
+        "buy_api_key",
+        "buy_credits",
     }
+
+
+@patch("llama_index.tools.insumer.base.requests.post")
+def test_buy_api_key_no_auth_required(mock_post: MagicMock) -> None:
+    """buy_api_key must NOT require an API key — wallet address is the identity."""
+    mock_post.return_value = _mock_response({
+        "ok": True,
+        "data": {
+            "success": True,
+            "key": "insr_live_newwallet000000000000000000000000000000",
+            "name": "my-agent",
+            "tier": "paid",
+            "dailyLimit": 10000,
+            "creditsAdded": 2500,
+            "totalCredits": 2500,
+            "effectiveRate": "$0.04/credit",
+            "chainName": "Base",
+            "registeredWallet": "0x" + "a" * 40,
+            "expiresAt": "2026-05-16T00:00:00.000Z",
+            "usdcPaid": "100.00",
+        },
+        "meta": {},
+    })
+
+    # No api_key provided — this must still work for buy_api_key
+    spec = InsumerToolSpec()
+    result = spec.buy_api_key(
+        tx_hash="0x" + "b" * 64,
+        chain_id=8453,
+        app_name="my-agent",
+        amount=100.0,
+    )
+
+    mock_post.assert_called_once()
+    call_args = mock_post.call_args
+    assert call_args.args[0] == "https://api.insumermodel.com/v1/keys/buy"
+    body = call_args.kwargs["json"]
+    assert body == {
+        "txHash": "0x" + "b" * 64,
+        "chainId": 8453,
+        "appName": "my-agent",
+        "amount": 100.0,
+    }
+    headers = call_args.kwargs["headers"]
+    # Critically: no X-API-Key header on buy_api_key
+    assert "X-API-Key" not in headers
+    assert headers["Content-Type"] == "application/json"
+
+    assert result["data"]["key"].startswith("insr_live_")
+    assert result["data"]["tier"] == "paid"
+
+
+@patch("llama_index.tools.insumer.base.requests.post")
+def test_buy_api_key_bitcoin_no_amount(mock_post: MagicMock) -> None:
+    mock_post.return_value = _mock_response({"ok": True, "data": {}, "meta": {}})
+    spec = InsumerToolSpec()
+    spec.buy_api_key(
+        tx_hash="abc123" * 10,
+        chain_id="bitcoin",
+        app_name="btc-agent",
+    )
+    body = mock_post.call_args.kwargs["json"]
+    # For Bitcoin, amount is not required — USD value derived from on-chain
+    assert "amount" not in body
+    assert body["chainId"] == "bitcoin"
+
+
+@patch("llama_index.tools.insumer.base.requests.post")
+def test_buy_api_key_channel_tag(mock_post: MagicMock) -> None:
+    mock_post.return_value = _mock_response({"ok": True, "data": {}, "meta": {}})
+    spec = InsumerToolSpec()
+    spec.buy_api_key(
+        tx_hash="0x" + "c" * 64,
+        chain_id=1,
+        app_name="my-agent",
+        amount=50.0,
+        channel="llamaindex-agent",
+    )
+    body = mock_post.call_args.kwargs["json"]
+    assert body["channel"] == "llamaindex-agent"
+
+
+@patch("llama_index.tools.insumer.base.requests.post")
+def test_buy_credits_requires_auth(mock_post: MagicMock, spec: InsumerToolSpec) -> None:
+    mock_post.return_value = _mock_response({
+        "ok": True,
+        "data": {
+            "creditsAdded": 2500,
+            "totalCredits": 3499,
+            "usdcPaid": "100.00",
+            "effectiveRate": "$0.04/credit",
+            "chainName": "Base",
+        },
+        "meta": {},
+    })
+    result = spec.buy_credits(
+        tx_hash="0x" + "d" * 64,
+        chain_id=8453,
+        amount=100.0,
+    )
+
+    mock_post.assert_called_once()
+    assert mock_post.call_args.args[0] == "https://api.insumermodel.com/v1/credits/buy"
+    body = mock_post.call_args.kwargs["json"]
+    assert body == {
+        "txHash": "0x" + "d" * 64,
+        "chainId": 8453,
+        "amount": 100.0,
+    }
+    headers = mock_post.call_args.kwargs["headers"]
+    # buy_credits REQUIRES the X-API-Key header (auth endpoint)
+    assert headers["X-API-Key"] == API_KEY
+    assert result["data"]["creditsAdded"] == 2500
+
+
+def test_buy_credits_no_key_raises() -> None:
+    spec = InsumerToolSpec()  # no key
+    with pytest.raises(ValueError, match="InsumerAPI key required"):
+        spec.buy_credits(tx_hash="0x" + "d" * 64, chain_id=8453, amount=100.0)
+
+
+@patch("llama_index.tools.insumer.base.requests.post")
+def test_buy_credits_update_wallet_flag(mock_post: MagicMock, spec: InsumerToolSpec) -> None:
+    mock_post.return_value = _mock_response({"ok": True, "data": {}, "meta": {}})
+    spec.buy_credits(
+        tx_hash="0x" + "e" * 64,
+        chain_id="bitcoin",
+        update_wallet=True,
+    )
+    body = mock_post.call_args.kwargs["json"]
+    assert body["updateWallet"] is True
+    assert "amount" not in body  # Not required for Bitcoin
