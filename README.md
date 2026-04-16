@@ -1,6 +1,6 @@
 # LlamaIndex Tools Integration: InsumerAPI
 
-Wallet auth and condition-based access for LlamaIndex agents. Across 33 blockchains — read → evaluate → sign, returning an ECDSA-signed boolean your agent can verify offline against the public JWKS. Boolean, not balance: the API never exposes wallet holdings, only a signed yes-or-no against the conditions you configure.
+Wallet auth and condition-based access for LlamaIndex agents. Across 33 chains — read → evaluate → sign, returning an ECDSA-signed boolean your agent can verify offline against the public JWKS. Boolean, not balance: the API never exposes wallet holdings, only a signed yes-or-no against the conditions you configure.
 
 Part of [InsumerAPI](https://insumermodel.com/developers/). No secrets. No identity-first. No static credentials.
 

@@ -1,6 +1,6 @@
 """InsumerAPI tool spec for LlamaIndex.
 
-Wallet auth and condition-based access across 33 blockchains.
+Wallet auth and condition-based access across 33 chains.
 Read --> evaluate --> sign. Returns an ECDSA-signed boolean you can verify
 offline against our public JWKS. Boolean, not balance: the API never exposes
 wallet holdings, only a signed yes-or-no against the conditions you configure.
@@ -23,7 +23,7 @@ class InsumerToolSpec(BaseToolSpec):
 
     - ``attest_wallet``: run wallet attestation against one or more conditions
       (token balance, NFT ownership, EAS attestation, Farcaster ID) across
-      33 blockchains. Returns an ECDSA-signed boolean verdict per condition
+      33 chains. Returns an ECDSA-signed boolean verdict per condition
       plus condition hashes for tamper detection.
     - ``get_trust_profile``: fetch a multi-dimensional wallet trust profile
       (stablecoins, governance, NFTs, staking, plus optional Solana/XRPL/Bitcoin
