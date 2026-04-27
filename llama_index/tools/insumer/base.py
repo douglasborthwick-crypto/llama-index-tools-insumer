@@ -36,10 +36,10 @@ class InsumerToolSpec(BaseToolSpec):
       on attestation and trust responses. No API key required. Enables offline
       verification.
     - ``buy_api_key``: let an agent purchase its own new API key on-chain with
-      USDC or BTC, no human in the loop. Wallet address is the identity; no
-      email required.
-    - ``buy_credits``: top up credits on an existing API key with a USDC or
-      BTC payment, no out-of-band billing.
+      USDC, USDT, or BTC, no human in the loop. Wallet address is the
+      identity; no email required.
+    - ``buy_credits``: top up credits on an existing API key with a USDC,
+      USDT, or BTC payment, no out-of-band billing.
     """
 
     spec_functions = [
