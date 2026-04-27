@@ -338,13 +338,14 @@ class InsumerToolSpec(BaseToolSpec):
         amount: Optional[float] = None,
         channel: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Buy a new API key on-chain with USDC or BTC. Agent-friendly: the
-        sender wallet address of the transaction becomes the registered
+        """Buy a new API key on-chain with USDC, USDT, or BTC. Agent-friendly:
+        the sender wallet address of the transaction becomes the registered
         identity on the new key. No email, no human signup flow.
 
-        Pre-requisite: the agent must have already broadcast a USDC or BTC
-        transfer to the platform wallet BEFORE calling this method. The
+        Pre-requisite: the agent must have already broadcast a USDC, USDT, or
+        BTC transfer to the platform wallet BEFORE calling this method. The
         transaction hash is then submitted here for on-chain verification.
+        USDC and USDT are auto-detected on EVM chains and Solana.
 
         One key per wallet — if the sending wallet already has a self-serve
         key, the API returns 409 and asks you to top up the existing key
@@ -353,15 +354,15 @@ class InsumerToolSpec(BaseToolSpec):
         Keys from this endpoint have a 30-day expiry and tier ``paid``.
 
         Args:
-            tx_hash: Transaction hash of the USDC or BTC transfer to the
+            tx_hash: Transaction hash of the USDC, USDT, or BTC transfer to the
                 platform wallet. Must not have been used before.
             chain_id: Either an EVM chain ID (int, e.g. 1, 8453, 10) for USDC
-                transfers, the string ``"solana"`` for USDC on Solana, or the
-                string ``"bitcoin"`` for BTC.
+                or USDT transfers, the string ``"solana"`` for USDC or USDT on
+                Solana, or the string ``"bitcoin"`` for BTC.
             app_name: Human-readable name for the key (max 100 chars).
-            amount: USDC amount paid (required for all USDC chains). Not
-                required for Bitcoin — the USD value is derived from the
-                on-chain BTC amount and a price feed.
+            amount: Stablecoin amount paid in USD (required for USDC and USDT
+                chains). Not required for Bitcoin — the USD value is derived
+                from the on-chain BTC amount and a price feed.
             channel: Optional tracking tag for the purchase channel.
 
         Returns:
@@ -385,7 +386,8 @@ class InsumerToolSpec(BaseToolSpec):
                         "expiresAt": ISO8601,              # +30 days
                         # Bitcoin only:
                         "btcPaid": float, "btcPrice": float, "usdEquivalent": float,
-                        # USDC only:
+                        # USDC or USDT (the field is named usdcPaid for backward
+                        # compatibility but reflects either stablecoin):
                         "usdcPaid": float,
                     },
                     "meta": {...},
@@ -418,22 +420,24 @@ class InsumerToolSpec(BaseToolSpec):
         amount: Optional[float] = None,
         update_wallet: bool = False,
     ) -> Dict[str, Any]:
-        """Top up attestation credits on an existing API key with a USDC or
-        BTC payment. Requires the API key the tool spec was initialized with.
+        """Top up attestation credits on an existing API key with a USDC,
+        USDT, or BTC payment. Requires the API key the tool spec was
+        initialized with.
 
         Pre-requisite: the agent or operator must have already broadcast a
-        USDC or BTC transfer to the platform wallet BEFORE calling this
-        method.
+        USDC, USDT, or BTC transfer to the platform wallet BEFORE calling
+        this method. USDC and USDT are auto-detected on EVM chains and
+        Solana.
 
         Args:
-            tx_hash: Transaction hash of the USDC or BTC transfer to the
-                platform wallet. Must not have been used before.
-            chain_id: Either an EVM chain ID (int) for USDC transfers, the
-                string ``"solana"`` for USDC on Solana, or the string
-                ``"bitcoin"`` for BTC.
-            amount: USDC amount paid (required for USDC chains). Not required
-                for Bitcoin — USD value is derived from the on-chain BTC
-                amount and a price feed.
+            tx_hash: Transaction hash of the USDC, USDT, or BTC transfer to
+                the platform wallet. Must not have been used before.
+            chain_id: Either an EVM chain ID (int) for USDC or USDT
+                transfers, the string ``"solana"`` for USDC or USDT on
+                Solana, or the string ``"bitcoin"`` for BTC.
+            amount: Stablecoin amount paid in USD (required for USDC and
+                USDT chains). Not required for Bitcoin — USD value is
+                derived from the on-chain BTC amount and a price feed.
             update_wallet: If the transaction sender differs from the wallet
                 currently registered on this API key, set to ``True`` to
                 rebind the registered wallet to the new sender. Defaults to
@@ -451,7 +455,8 @@ class InsumerToolSpec(BaseToolSpec):
                         "totalCredits": int,
                         "effectiveRate": "$0.04/credit",
                         "chainName": str,
-                        # USDC chains:
+                        # USDC or USDT (field named usdcPaid for backward
+                        # compatibility but reflects either stablecoin):
                         "usdcPaid": float,
                         # Bitcoin:
                         "btcPaid": float, "btcPrice": float, "usdEquivalent": float,
