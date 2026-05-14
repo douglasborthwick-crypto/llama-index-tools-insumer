@@ -1,6 +1,6 @@
 """InsumerAPI tool spec for LlamaIndex.
 
-Wallet auth and condition-based access across 33 chains.
+Wallet auth and condition-based access across 37 chains.
 Read --> evaluate --> sign. Returns an ECDSA-signed boolean you can verify
 offline against our public JWKS. Boolean, not balance: the API never exposes
 wallet holdings, only a signed yes-or-no against the conditions you configure.
@@ -23,11 +23,13 @@ class InsumerToolSpec(BaseToolSpec):
 
     - ``attest_wallet``: run wallet attestation against one or more conditions
       (token balance, NFT ownership, EAS attestation, Farcaster ID) across
-      33 chains. Returns an ECDSA-signed boolean verdict per condition
+      37 chains. Returns an ECDSA-signed boolean verdict per condition
       plus condition hashes for tamper detection.
     - ``get_trust_profile``: fetch a multi-dimensional wallet trust profile
-      (stablecoins, governance, NFTs, staking, plus optional Solana/XRPL/Bitcoin
-      dimensions). Returns a signed summary of which dimensions show activity.
+      (stablecoins, governance, NFTs, staking, plus optional
+      Solana/XRPL/Bitcoin/Tron/Stellar/Sui dimensions). Returns a signed
+      summary of which dimensions show activity. Up to 49 checks across 27
+      chains.
     - ``list_compliance_templates``: discover pre-configured compliance
       templates (Coinbase Verified Account, Gitcoin Passport, etc.) usable
       directly in attest_wallet without raw EAS schema IDs. No API key
@@ -108,6 +110,9 @@ class InsumerToolSpec(BaseToolSpec):
         solana_wallet: Optional[str] = None,
         xrpl_wallet: Optional[str] = None,
         bitcoin_wallet: Optional[str] = None,
+        tron_wallet: Optional[str] = None,
+        stellar_wallet: Optional[str] = None,
+        sui_wallet: Optional[str] = None,
         proof: Optional[str] = None,
         format: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -139,6 +144,21 @@ class InsumerToolSpec(BaseToolSpec):
                 Required for conditions with ``chainId: "bitcoin"``. Bitcoin
                 only supports ``token_balance`` with ``contractAddress:
                 "native"``.
+            tron_wallet: Tron address (T-prefixed base58, 34 chars). Required
+                for conditions with ``chainId: "tron"``. Supports native TRX
+                (``contractAddress: "native"``) and TRC-20 tokens like
+                USDT-TRC20.
+            stellar_wallet: Stellar address (G-prefixed, 56 chars). Required
+                for conditions with ``chainId: "stellar"``. Supports native
+                XLM (``contractAddress: "native"``) and classic trustline
+                assets — pass the issuer G-address as ``contractAddress`` and
+                the asset code (e.g. ``"USDC"``, ``"BENJI"``) as
+                ``assetCode``. Soroban contract balances are not visible.
+            sui_wallet: Sui address (0x + 64 hex chars). Required for
+                conditions with ``chainId: "sui"``. Supports native SUI
+                (``contractAddress: "native"``) and Sui-native tokens — pass
+                the fully-qualified type string (e.g.
+                ``"0xdba34672...::usdc::USDC"``) as ``contractAddress``.
             proof: Set to ``"merkle"`` to include EIP-1186 Merkle storage
                 proofs in results. Costs 2 credits instead of 1. Reveals raw
                 balance to the caller.
@@ -178,6 +198,12 @@ class InsumerToolSpec(BaseToolSpec):
             body["xrplWallet"] = xrpl_wallet
         if bitcoin_wallet:
             body["bitcoinWallet"] = bitcoin_wallet
+        if tron_wallet:
+            body["tronWallet"] = tron_wallet
+        if stellar_wallet:
+            body["stellarWallet"] = stellar_wallet
+        if sui_wallet:
+            body["suiWallet"] = sui_wallet
         if proof:
             body["proof"] = proof
         if format:
@@ -190,12 +216,15 @@ class InsumerToolSpec(BaseToolSpec):
         solana_wallet: Optional[str] = None,
         xrpl_wallet: Optional[str] = None,
         bitcoin_wallet: Optional[str] = None,
+        tron_wallet: Optional[str] = None,
+        stellar_wallet: Optional[str] = None,
+        sui_wallet: Optional[str] = None,
         proof: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Fetch a multi-dimensional wallet trust profile. Returns an
         ECDSA-signed summary across stablecoins, governance, NFTs, and
-        staking dimensions (plus Solana/XRPL/Bitcoin when those wallet
-        addresses are provided).
+        staking dimensions (plus Solana/XRPL/Bitcoin/Tron/Stellar/Sui
+        when those wallet addresses are provided).
 
         Trust profile reports which dimensions show activity. Each dimension
         runs a curated set of token/NFT balance checks (``balance > 0``).
@@ -209,6 +238,12 @@ class InsumerToolSpec(BaseToolSpec):
                 (RLUSD, USDC).
             bitcoin_wallet: Optional Bitcoin address. Adds native BTC balance
                 check.
+            tron_wallet: Optional Tron T-address. Adds USDT-TRC20 check on
+                Tron.
+            stellar_wallet: Optional Stellar G-address. Adds institutional
+                USDC and BENJI (Franklin) trustline checks on Stellar.
+            sui_wallet: Optional Sui address (0x + 64 hex). Adds
+                institutional USDC check on Sui.
             proof: Set to ``"merkle"`` for EIP-1186 Merkle storage proofs on
                 stablecoin/governance checks. Costs 6 credits instead of 3.
 
@@ -233,6 +268,8 @@ class InsumerToolSpec(BaseToolSpec):
                                 "solana": {...},
                                 "xrpl": {...},
                                 "bitcoin": {...},
+                                "tron": {...},
+                                "institutional_stablecoins": {...},   # Stellar + Sui issuances
                             },
                             "summary": {
                                 "totalChecks": int,
@@ -257,6 +294,12 @@ class InsumerToolSpec(BaseToolSpec):
             body["xrplWallet"] = xrpl_wallet
         if bitcoin_wallet:
             body["bitcoinWallet"] = bitcoin_wallet
+        if tron_wallet:
+            body["tronWallet"] = tron_wallet
+        if stellar_wallet:
+            body["stellarWallet"] = stellar_wallet
+        if sui_wallet:
+            body["suiWallet"] = sui_wallet
         if proof:
             body["proof"] = proof
         return self._post("/v1/trust", body)
@@ -345,7 +388,8 @@ class InsumerToolSpec(BaseToolSpec):
         Pre-requisite: the agent must have already broadcast a USDC, USDT, or
         BTC transfer to the platform wallet BEFORE calling this method. The
         transaction hash is then submitted here for on-chain verification.
-        USDC and USDT are auto-detected on EVM chains and Solana.
+        USDC and USDT are auto-detected on EVM chains and Solana; USDT-TRC20
+        is supported on Tron.
 
         One key per wallet — if the sending wallet already has a self-serve
         key, the API returns 409 and asks you to top up the existing key
@@ -358,11 +402,13 @@ class InsumerToolSpec(BaseToolSpec):
                 platform wallet. Must not have been used before.
             chain_id: Either an EVM chain ID (int, e.g. 1, 8453, 10) for USDC
                 or USDT transfers, the string ``"solana"`` for USDC or USDT on
-                Solana, or the string ``"bitcoin"`` for BTC.
+                Solana, the string ``"tron"`` for USDT-TRC20 on Tron, or the
+                string ``"bitcoin"`` for BTC.
             app_name: Human-readable name for the key (max 100 chars).
-            amount: Stablecoin amount paid in USD (required for USDC and USDT
-                chains). Not required for Bitcoin — the USD value is derived
-                from the on-chain BTC amount and a price feed.
+            amount: Stablecoin amount paid in USD (required for USDC, USDT,
+                and USDT-TRC20 chains). Not required for Bitcoin — the USD
+                value is derived from the on-chain BTC amount and a price
+                feed.
             channel: Optional tracking tag for the purchase channel.
 
         Returns:
@@ -427,17 +473,19 @@ class InsumerToolSpec(BaseToolSpec):
         Pre-requisite: the agent or operator must have already broadcast a
         USDC, USDT, or BTC transfer to the platform wallet BEFORE calling
         this method. USDC and USDT are auto-detected on EVM chains and
-        Solana.
+        Solana; USDT-TRC20 is supported on Tron.
 
         Args:
             tx_hash: Transaction hash of the USDC, USDT, or BTC transfer to
                 the platform wallet. Must not have been used before.
             chain_id: Either an EVM chain ID (int) for USDC or USDT
                 transfers, the string ``"solana"`` for USDC or USDT on
-                Solana, or the string ``"bitcoin"`` for BTC.
-            amount: Stablecoin amount paid in USD (required for USDC and
-                USDT chains). Not required for Bitcoin — USD value is
-                derived from the on-chain BTC amount and a price feed.
+                Solana, the string ``"tron"`` for USDT-TRC20 on Tron, or
+                the string ``"bitcoin"`` for BTC.
+            amount: Stablecoin amount paid in USD (required for USDC, USDT,
+                and USDT-TRC20 chains). Not required for Bitcoin — USD
+                value is derived from the on-chain BTC amount and a price
+                feed.
             update_wallet: If the transaction sender differs from the wallet
                 currently registered on this API key, set to ``True`` to
                 rebind the registered wallet to the new sender. Defaults to

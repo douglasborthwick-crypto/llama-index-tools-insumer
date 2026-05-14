@@ -1,6 +1,6 @@
 # LlamaIndex Tools Integration: InsumerAPI
 
-Wallet auth and condition-based access for LlamaIndex agents. Across 33 chains — read → evaluate → sign, returning an ECDSA-signed boolean your agent can verify offline against the public JWKS. Boolean, not balance: the API never exposes wallet holdings, only a signed yes-or-no against the conditions you configure.
+Wallet auth and condition-based access for LlamaIndex agents. Across 37 chains — read → evaluate → sign, returning an ECDSA-signed boolean your agent can verify offline against the public JWKS. Boolean, not balance: the API never exposes wallet holdings, only a signed yes-or-no against the conditions you configure.
 
 Part of [InsumerAPI](https://insumermodel.com/developers/). No secrets. No identity-first. No static credentials.
 
@@ -47,7 +47,7 @@ Run wallet attestation against 1–10 conditions. Returns an ECDSA-signed verdic
 
 Supported condition types:
 
-- `token_balance` — ERC-20/SPL/XRPL trust line / native BTC ≥ threshold
+- `token_balance` — ERC-20 / SPL / XRPL trust line / native BTC / TRC-20 / Stellar trustline / Sui-native ≥ threshold
 - `nft_ownership` — ERC-721/ERC-1155/XRPL NFToken holding
 - `eas_attestation` — EAS schema check (pass a `template` like `coinbase_verified_account` or a raw `schemaId`)
 - `farcaster_id` — Farcaster ID registered on Optimism
@@ -94,7 +94,7 @@ Costs 1 credit per call (2 with `proof="merkle"` for EIP-1186 storage proofs).
 
 ### `get_trust_profile`
 
-Multi-dimensional wallet trust profile — stablecoins, governance, NFTs, staking (plus Solana, XRPL, Bitcoin when those wallet addresses are supplied). Returns a signed summary showing which dimensions have activity, without exposing raw balances.
+Multi-dimensional wallet trust profile — stablecoins, governance, NFTs, staking (plus Solana, XRPL, Bitcoin, Tron, Stellar, Sui when those wallet addresses are supplied). Returns a signed summary showing which dimensions have activity, without exposing raw balances. Up to 49 checks across 27 chains.
 
 ```python
 insumer.get_trust_profile(
@@ -102,6 +102,9 @@ insumer.get_trust_profile(
     solana_wallet="...",       # optional
     xrpl_wallet="r...",        # optional
     bitcoin_wallet="bc1q...",  # optional
+    tron_wallet="T...",        # optional
+    stellar_wallet="G...",     # optional
+    sui_wallet="0x...",        # optional (64 hex chars)
 )
 ```
 
@@ -144,7 +147,7 @@ Pre-requisite: broadcast a USDC or BTC transfer to the platform wallet first, th
 # After the agent broadcasts a 100 USDC transfer on Base to the platform wallet:
 result = InsumerToolSpec().buy_api_key(
     tx_hash="0xabc...",
-    chain_id=8453,            # Base; use "solana" or "bitcoin" for those chains
+    chain_id=8453,            # Base; use "solana", "bitcoin", or "tron" for those chains
     app_name="my-agent",
     amount=100.0,              # USDC amount; not required for Bitcoin
 )
@@ -167,12 +170,15 @@ insumer.buy_credits(
 
 ## Supported chains
 
-33 total:
+37 total:
 
-- **30 EVM chains**: Ethereum, Base, Arbitrum, Optimism, Polygon, Avalanche, BNB, Unichain, Linea, zkSync, Scroll, Blast, Mantle, Celo, Gnosis, Fantom, Sonic, Cronos, Moonbeam, and more
+- **31 EVM chains**: Ethereum, Base, Arbitrum, Optimism, Polygon, Avalanche, BNB, XDC, Unichain, Linea, zkSync, Scroll, Blast, Mantle, Celo, Gnosis, Sonic, Moonbeam, and more
 - **Solana** (mainnet)
 - **XRPL** (mainnet) — native XRP plus trust-line tokens
 - **Bitcoin** (mainnet) — native BTC only
+- **Tron** — native TRX plus TRC-20 (USDT-TRC20)
+- **Stellar** — native XLM plus classic trustline assets (USDC, BENJI, etc.)
+- **Sui** — native SUI plus Sui-native tokens (USDC)
 
 ## Positioning
 

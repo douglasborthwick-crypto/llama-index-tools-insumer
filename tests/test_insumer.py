@@ -209,11 +209,78 @@ def test_get_trust_profile_multichain(mock_post: MagicMock, spec: InsumerToolSpe
         solana_wallet="5Hdh2n3473SaZBCG4dFL83w7p1W9cgPJqKroabc",
         xrpl_wallet="rN7n3473SaZBCG4dFL83w7p1W9cgPJqKro",
         bitcoin_wallet="bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq",
+        tron_wallet="TAUN6FwrnwwmaEqYcckffC7wYmbaS6cBiX",
+        stellar_wallet="GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+        sui_wallet="0x" + "0" * 63 + "5",
     )
     body = mock_post.call_args.kwargs["json"]
     assert body["solanaWallet"].startswith("5Hdh")
     assert body["xrplWallet"].startswith("r")
     assert body["bitcoinWallet"].startswith("bc1")
+    assert body["tronWallet"].startswith("T")
+    assert body["stellarWallet"].startswith("G")
+    assert body["suiWallet"].startswith("0x")
+    assert len(body["suiWallet"]) == 66
+
+
+@patch("llama_index.tools.insumer.base.requests.post")
+def test_attest_wallet_tron(mock_post: MagicMock, spec: InsumerToolSpec) -> None:
+    mock_post.return_value = _mock_response({"ok": True, "data": {}, "meta": {}})
+    spec.attest_wallet(
+        tron_wallet="TAUN6FwrnwwmaEqYcckffC7wYmbaS6cBiX",
+        conditions=[{
+            "type": "token_balance",
+            "contractAddress": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+            "chainId": "tron",
+            "threshold": 1,
+            "decimals": 6,
+            "label": "USDT-TRC20 >= 1",
+        }],
+    )
+    body = mock_post.call_args.kwargs["json"]
+    assert body["tronWallet"] == "TAUN6FwrnwwmaEqYcckffC7wYmbaS6cBiX"
+    assert body["conditions"][0]["chainId"] == "tron"
+    assert "wallet" not in body
+
+
+@patch("llama_index.tools.insumer.base.requests.post")
+def test_attest_wallet_stellar(mock_post: MagicMock, spec: InsumerToolSpec) -> None:
+    mock_post.return_value = _mock_response({"ok": True, "data": {}, "meta": {}})
+    spec.attest_wallet(
+        stellar_wallet="GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+        conditions=[{
+            "type": "token_balance",
+            "contractAddress": "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+            "chainId": "stellar",
+            "assetCode": "USDC",
+            "threshold": 1,
+            "label": "USDC trustline >= 1",
+        }],
+    )
+    body = mock_post.call_args.kwargs["json"]
+    assert body["stellarWallet"].startswith("G")
+    assert body["conditions"][0]["chainId"] == "stellar"
+    assert body["conditions"][0]["assetCode"] == "USDC"
+
+
+@patch("llama_index.tools.insumer.base.requests.post")
+def test_attest_wallet_sui(mock_post: MagicMock, spec: InsumerToolSpec) -> None:
+    mock_post.return_value = _mock_response({"ok": True, "data": {}, "meta": {}})
+    spec.attest_wallet(
+        sui_wallet="0x" + "0" * 63 + "5",
+        conditions=[{
+            "type": "token_balance",
+            "contractAddress": "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
+            "chainId": "sui",
+            "threshold": 1,
+            "decimals": 6,
+            "label": "USDC on Sui >= 1",
+        }],
+    )
+    body = mock_post.call_args.kwargs["json"]
+    assert body["suiWallet"].startswith("0x")
+    assert len(body["suiWallet"]) == 66
+    assert body["conditions"][0]["chainId"] == "sui"
 
 
 @patch("llama_index.tools.insumer.base.requests.get")
