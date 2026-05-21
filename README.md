@@ -12,13 +12,15 @@ pip install llama-index-tools-insumer
 
 ## Quickstart
 
-Get a free API key at [insumermodel.com/developers/](https://insumermodel.com/developers/) (no credit card required for the free tier):
+**Get a key — no signup, no dashboard, no password.** Two paths, both return an `insr_live_...` key instantly with 10 verification credits and 100 reads/day:
 
 ```bash
 curl -X POST https://api.insumermodel.com/v1/keys/create \
     -H "Content-Type: application/json" \
     -d '{"email": "you@example.com", "appName": "my-agent", "tier": "free"}'
 ```
+
+Or enter your email on [insumermodel.com](https://insumermodel.com/?utm_source=pypi-llama-index-tools-insumer) — the key appears inline. Already have a key? Manage it at [insumermodel.com/developers/account/](https://insumermodel.com/developers/account/?utm_source=pypi-llama-index-tools-insumer).
 
 Then use the tool spec in any LlamaIndex agent:
 
