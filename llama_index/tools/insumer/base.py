@@ -121,19 +121,26 @@ class InsumerToolSpec(BaseToolSpec):
 
         Wallet auth primitive: read --> evaluate --> sign. The API reads the
         relevant wallet state (token balance, NFT ownership, EAS attestation,
-        or Farcaster ID), evaluates it against the caller-specified condition,
-        and returns a signed boolean. Raw balances are never returned in
+        Farcaster ID, or a balance ratio), evaluates it against the
+        caller-specified condition, and returns a signed boolean. Raw balances are never returned in
         standard mode (use proof="merkle" if you want the storage proof,
         which reveals the balance).
 
         Args:
             conditions: List of 1 to 10 condition objects. Each object must
                 have a ``type`` field: ``token_balance``, ``nft_ownership``,
-                ``eas_attestation``, or ``farcaster_id``. Token balance
-                conditions require ``contractAddress``, ``chainId``,
-                ``threshold``, and (for EVM) ``decimals``. EAS conditions
-                can use a pre-configured ``template`` (from
-                list_compliance_templates) or a raw ``schemaId``.
+                ``eas_attestation``, ``farcaster_id``, ``ratio_to_amount``,
+                or ``ratio_to_supply``. Token balance conditions require
+                ``contractAddress``, ``chainId``, ``threshold``, and (for EVM)
+                ``decimals``. EAS conditions can use a pre-configured
+                ``template`` (from list_compliance_templates) or a raw
+                ``schemaId``. ``ratio_to_amount`` (RPC EVM chains only)
+                requires ``contractAddress``, ``chainId``, ``multiple``, and
+                ``amount`` — met iff balance >= multiple * amount.
+                ``ratio_to_supply`` (RPC EVM, ERC-20 only) requires
+                ``contractAddress``, ``chainId``, and ``minFraction``, a
+                fraction in (0, 1] — met iff balance / totalSupply >=
+                minFraction.
             wallet: EVM wallet address (0x + 40 hex). Required if any
                 condition targets an EVM chain.
             solana_wallet: Solana wallet address (base58, 32-44 chars).

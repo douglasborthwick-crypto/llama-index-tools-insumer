@@ -53,6 +53,8 @@ Supported condition types:
 - `nft_ownership` — ERC-721/ERC-1155/XRPL NFToken holding
 - `eas_attestation` — EAS schema check (pass a `template` like `coinbase_verified_account` or a raw `schemaId`)
 - `farcaster_id` — Farcaster ID registered on Optimism
+- `ratio_to_amount` — self-scaling agent-spend rule: balance ≥ `multiple` × `amount` (RPC EVM chains only)
+- `ratio_to_supply` — share-of-supply rule: balance / `totalSupply()` ≥ `minFraction`, a fraction in (0, 1] (RPC EVM chains, ERC-20 only)
 
 ```python
 insumer.attest_wallet(
