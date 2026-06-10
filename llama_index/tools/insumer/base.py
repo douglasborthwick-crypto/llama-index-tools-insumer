@@ -131,8 +131,9 @@ class InsumerToolSpec(BaseToolSpec):
                 have a ``type`` field: ``token_balance``, ``nft_ownership``,
                 ``eas_attestation``, ``farcaster_id``, ``ratio_to_amount``,
                 or ``ratio_to_supply``. Token balance conditions require
-                ``contractAddress``, ``chainId``, ``threshold``, and (for EVM)
-                ``decimals``. EAS conditions can use a pre-configured
+                ``contractAddress``, ``chainId``, ``threshold`` (a decimal
+                string in token units, e.g. ``"100"``; a number is coerced),
+                and (for EVM) ``decimals``. EAS conditions can use a pre-configured
                 ``template`` (from list_compliance_templates) or a raw
                 ``schemaId``. ``ratio_to_amount`` (RPC EVM chains only)
                 requires ``contractAddress``, ``chainId``, ``multiple``, and
@@ -196,7 +197,30 @@ class InsumerToolSpec(BaseToolSpec):
                     "meta": {"creditsRemaining": int, "creditsCharged": int, ...},
                 }
         """
-        body: Dict[str, Any] = {"conditions": conditions}
+        # v2 keys require agent-supplied quantities as decimal strings (full precision,
+        # no float in signed bytes); v1 keys accept either. Coerce numbers to strings so
+        # the request works on any key. (str() only — the builtin format() is shadowed by
+        # the `format` parameter of this method.)
+        #   token_balance.threshold, ratio_to_amount.multiple/amount, ratio_to_supply.minFraction.
+        _str_fields = {
+            "token_balance": ("threshold",),
+            "ratio_to_amount": ("multiple", "amount"),
+            "ratio_to_supply": ("minFraction",),
+        }
+        norm_conditions: List[Dict[str, Any]] = []
+        for c in conditions:
+            if isinstance(c, dict):
+                fields = _str_fields.get(c.get("type"))
+                if fields:
+                    updates = {
+                        f: str(c[f])
+                        for f in fields
+                        if c.get(f) is not None and not isinstance(c[f], str)
+                    }
+                    if updates:
+                        c = {**c, **updates}
+            norm_conditions.append(c)
+        body: Dict[str, Any] = {"conditions": norm_conditions}
         if wallet:
             body["wallet"] = wallet
         if solana_wallet:

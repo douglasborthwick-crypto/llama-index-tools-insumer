@@ -64,13 +64,15 @@ insumer.attest_wallet(
             "type": "token_balance",
             "contractAddress": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
             "chainId": 8453,
-            "threshold": 100,
+            "threshold": "100",
             "decimals": 6,
             "label": "USDC on Base >= 100",
         },
     ],
 )
 ```
+
+> **`token_balance` thresholds are decimal strings** — send `"threshold": "100"`, not `100`. Keys created from 2026-06-10 sign with `kid: insumer-attest-v2` and reject a JSON number with a `400` (a string works on both v1 and v2 keys). This tool coerces a number to a string for you.
 
 Response shape:
 

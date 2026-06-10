@@ -86,7 +86,8 @@ def test_attest_wallet_evm_token_balance(mock_post: MagicMock, spec: InsumerTool
     assert body["wallet"] == wallet
     assert body["conditions"][0]["type"] == "token_balance"
     assert body["conditions"][0]["chainId"] == 8453
-    assert body["conditions"][0]["threshold"] == 100
+    # token_balance threshold is coerced to a decimal string (v2 keys require it).
+    assert body["conditions"][0]["threshold"] == "100"
     assert "solanaWallet" not in body
     assert "xrplWallet" not in body
     headers = call_args.kwargs["headers"]
