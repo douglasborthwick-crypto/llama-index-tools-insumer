@@ -1,6 +1,6 @@
 # LlamaIndex Tools Integration: InsumerAPI
 
-Wallet auth and condition-based access for LlamaIndex agents. Across 37 chains — read → evaluate → sign, returning an ECDSA-signed boolean your agent can verify offline against the public JWKS. Boolean, not balance: the API never exposes wallet holdings, only a signed yes-or-no against the conditions you configure.
+Wallet auth and condition-based access for LlamaIndex agents. Across 38 chains — read → evaluate → sign, returning an ECDSA-signed boolean your agent can verify offline against the public JWKS. Boolean, not balance: the API never exposes wallet holdings, only a signed yes-or-no against the conditions you configure.
 
 Part of [InsumerAPI](https://insumermodel.com/developers/). No secrets. No identity-first. No static credentials.
 
@@ -176,9 +176,9 @@ insumer.buy_credits(
 
 ## Supported chains
 
-37 total:
+38 total:
 
-- **31 EVM chains**: Ethereum, Base, Arbitrum, Optimism, Polygon, Avalanche, BNB, XDC, Unichain, Linea, zkSync, Scroll, Blast, Mantle, Celo, Gnosis, Sonic, Moonbeam, and more
+- **32 EVM chains**: Ethereum, Base, Arbitrum, Optimism, Polygon, Avalanche, BNB, XDC, Robinhood Chain, Unichain, Linea, zkSync, Scroll, Blast, Mantle, Celo, Gnosis, Sonic, Moonbeam, and more
 - **Solana** (mainnet)
 - **XRPL** (mainnet) — native XRP plus trust-line tokens
 - **Bitcoin** (mainnet) — native BTC only

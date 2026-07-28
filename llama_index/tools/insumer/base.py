@@ -1,6 +1,6 @@
 """InsumerAPI tool spec for LlamaIndex.
 
-Wallet auth and condition-based access across 37 chains.
+Wallet auth and condition-based access across 38 chains.
 Read --> evaluate --> sign. Returns an ECDSA-signed boolean you can verify
 offline against our public JWKS. Boolean, not balance: the API never exposes
 wallet holdings, only a signed yes-or-no against the conditions you configure.
@@ -23,7 +23,7 @@ class InsumerToolSpec(BaseToolSpec):
 
     - ``attest_wallet``: run wallet attestation against one or more conditions
       (token balance, NFT ownership, EAS attestation, Farcaster ID) across
-      37 chains. Returns an ECDSA-signed boolean verdict per condition
+      38 chains. Returns an ECDSA-signed boolean verdict per condition
       plus condition hashes for tamper detection.
     - ``get_trust_profile``: fetch a multi-dimensional wallet trust profile
       (stablecoins, governance, NFTs, staking, plus optional
@@ -128,9 +128,12 @@ class InsumerToolSpec(BaseToolSpec):
 
         Args:
             conditions: List of 1 to 10 condition objects. Each object must
-                have a ``type`` field: ``token_balance``, ``nft_ownership``,
-                ``eas_attestation``, ``farcaster_id``, ``ratio_to_amount``,
-                or ``ratio_to_supply``. Token balance conditions require
+                have a ``type`` field: ``token_balance``, ``nft_ownership``
+                (34 of the 38 chains: EVM + Solana + XRPL; Bitcoin, Tron,
+                Stellar and Sui are token-balance only), ``eas_attestation``,
+                ``farcaster_id``, ``evm_view_call``, ``ratio_to_amount``,
+                ``ratio_to_supply``, ``erc8004_agent``, or
+                ``erc7710_delegation``. Token balance conditions require
                 ``contractAddress``, ``chainId``, ``threshold`` (a decimal
                 string in token units, e.g. ``"100"``; a number is coerced),
                 and (for EVM) ``decimals``. EAS conditions can use a pre-configured
@@ -141,7 +144,24 @@ class InsumerToolSpec(BaseToolSpec):
                 ``ratio_to_supply`` (RPC EVM, ERC-20 only) requires
                 ``contractAddress``, ``chainId``, and ``minFraction``, a
                 fraction in (0, 1] — met iff balance / totalSupply >=
-                minFraction.
+                minFraction. ``evm_view_call`` (RPC EVM only) requires
+                ``contractAddress`` and ``selector`` — the canonical
+                signature of a single-address-argument view function
+                returning bool (e.g. ``"hasAccess(address)"``).
+                ``erc8004_agent`` (Base, chainId 8453) requires
+                ``agentId``, a uint256 decimal string — met iff the wallet
+                owns the agent NFT or is the registry's agentWallet binding
+                (registration is permissionless; no vetting implied).
+                ``erc7710_delegation`` (Base, chainId 8453, max 3 per
+                call) requires ``delegationManager``,
+                ``expectedDelegator``, and ``delegation`` ({delegator,
+                delegate, authority, caveats, salt, signature}) — met iff
+                the wallet is the delegate, the delegator matches, the
+                EIP-712 signature verifies (EOA or ERC-1271), unrevoked at
+                the anchored block, all caveat enforcers recognized, and
+                time windows are satisfied. Spend/target/call limits are
+                reported as declaredLimits, not simulated; delegation
+                attestations expire in 5 minutes.
             wallet: EVM wallet address (0x + 40 hex). Required if any
                 condition targets an EVM chain.
             solana_wallet: Solana wallet address (base58, 32-44 chars).
