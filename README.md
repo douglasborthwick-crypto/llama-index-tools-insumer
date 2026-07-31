@@ -41,7 +41,7 @@ agent.chat(
 )
 ```
 
-## The four tools
+## The six tools
 
 ### `attest_wallet`
 
@@ -173,6 +173,12 @@ insumer.buy_credits(
     amount=100.0,
 )
 ```
+
+## No key at all: x402 pay-per-call
+
+This tool spec authenticates with an API key (free tier: 10 credits via `POST /v1/keys/create`, or on-chain purchase via `buy_api_key`). If your agent wants zero signup of any kind, the same core endpoints — `POST /v1/attest`, `POST /v1/trust`, `POST /v1/trust/batch` — also accept [x402](https://www.x402.org) payments directly: call with no credentials, receive a 402 quote, sign an EIP-3009 USDC authorization on Base for the exact quoted amount, retry with the `X-PAYMENT` header. $0.05 per attestation ($0.10 with a Merkle proof), settlement is gasless for the payer. That flow lives outside this package (it needs wallet signing, not an LLM tool), but the responses are identical — same signed attestations, verifiable against the same JWKS.
+
+Pay-per-call wallets that reach $1.00 in cumulative spend become eligible to claim a soulbound Insumer Access pass (nothing mints unless the wallet asks — its first wallet-auth request is the claim), which unlocks prepaid credit rates ($0.04–$0.02/call) and single-round-trip calls. Details: [insumermodel.com/llms.txt](https://insumermodel.com/llms.txt).
 
 ## Supported chains
 
