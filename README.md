@@ -9,7 +9,7 @@ Part of [InsumerAPI](https://insumermodel.com/developers/). No secrets. No ident
 ```bash
 pip install llama-index-tools-insumer
 # the Quickstart's agent additionally needs:
-pip install llama-index-agent-openai
+pip install llama-index-llms-openai
 ```
 
 ## Quickstart
@@ -27,20 +27,24 @@ Or enter your email on [insumermodel.com](https://insumermodel.com/?utm_source=p
 Then use the tool spec in any LlamaIndex agent:
 
 ```python
+import asyncio
+
+from llama_index.core.agent.workflow import FunctionAgent
+from llama_index.llms.openai import OpenAI
 from llama_index.tools.insumer import InsumerToolSpec
-from llama_index.agent.openai import OpenAIAgent
 
 insumer = InsumerToolSpec()  # reads INSUMER_API_KEY; or pass api_key="insr_live_..."
 
-agent = OpenAIAgent.from_tools(
-    insumer.to_tool_list(),
-    verbose=True,
+agent = FunctionAgent(
+    tools=insumer.to_tool_list(),
+    llm=OpenAI(model="gpt-4o-mini"),
 )
 
-agent.chat(
+response = asyncio.run(agent.run(
     "Does wallet 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 "
-    "hold at least 100 USDC on Base?"
-)
+    "hold at least 1 ETH on Ethereum?"
+))
+print(response)
 ```
 
 ## The six tools
@@ -64,11 +68,11 @@ insumer.attest_wallet(
     conditions=[
         {
             "type": "token_balance",
-            "contractAddress": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-            "chainId": 8453,
-            "threshold": "100",
-            "decimals": 6,
-            "label": "USDC on Base >= 100",
+            "contractAddress": "native",
+            "chainId": 1,
+            "threshold": "1",
+            "decimals": 18,
+            "label": "ETH >= 1 on Ethereum",  # a condition the example wallet reliably meets
         },
     ],
 )
