@@ -8,6 +8,8 @@ Part of [InsumerAPI](https://insumermodel.com/developers/). No secrets. No ident
 
 ```bash
 pip install llama-index-tools-insumer
+# the Quickstart's agent additionally needs:
+pip install llama-index-agent-openai
 ```
 
 ## Quickstart
@@ -28,7 +30,7 @@ Then use the tool spec in any LlamaIndex agent:
 from llama_index.tools.insumer import InsumerToolSpec
 from llama_index.agent.openai import OpenAIAgent
 
-insumer = InsumerToolSpec(api_key="insr_live_...")
+insumer = InsumerToolSpec()  # reads INSUMER_API_KEY; or pass api_key="insr_live_..."
 
 agent = OpenAIAgent.from_tools(
     insumer.to_tool_list(),

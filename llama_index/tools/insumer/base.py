@@ -6,6 +6,8 @@ offline against our public JWKS. Boolean, not balance: the API never exposes
 wallet holdings, only a signed yes-or-no against the conditions you configure.
 """
 
+import os
+
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -62,14 +64,16 @@ class InsumerToolSpec(BaseToolSpec):
         """Initialize the InsumerAPI tool spec.
 
         Args:
-            api_key: Your InsumerAPI key (format ``insr_live_...``). Required
-                for ``attest_wallet`` and ``get_trust_profile``. Not needed for
+            api_key: Your InsumerAPI key (format ``insr_live_...``). Falls
+                back to the ``INSUMER_API_KEY`` environment variable when
+                omitted, so keys stay out of source code. Required for
+                ``attest_wallet`` and ``get_trust_profile``. Not needed for
                 ``list_compliance_templates`` or ``get_jwks``. Get a free key
                 at https://insumermodel.com/developers/.
             base_url: API base URL. Defaults to ``https://api.insumermodel.com``.
             timeout: HTTP request timeout in seconds. Defaults to 30.
         """
-        self.api_key = api_key
+        self.api_key = api_key or os.environ.get("INSUMER_API_KEY")
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
