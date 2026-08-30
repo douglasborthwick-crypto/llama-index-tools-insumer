@@ -211,7 +211,9 @@ class InsumerToolSpec(BaseToolSpec):
                             "expiresAt": ISO8601,
                         },
                         "sig": str,                # ECDSA P-256, base64
-                        "kid": "insumer-attest-v1",
+                        "kid": str,                # "insumer-attest-v2" on keys minted
+                                                   # today; "insumer-attest-v1" on
+                                                   # pre-cutover keys
                         "jwt": str,                # if format="jwt"
                     },
                     "meta": {"creditsRemaining": int, "creditsCharged": int, ...},
@@ -333,7 +335,9 @@ class InsumerToolSpec(BaseToolSpec):
                             "expiresAt": ISO8601,
                         },
                         "sig": str,                # ECDSA P-256, base64
-                        "kid": "insumer-attest-v1",
+                        "kid": str,                # "insumer-trust-v2" on keys minted
+                                                   # today; "insumer-attest-v1" on
+                                                   # pre-cutover keys
                     },
                     "meta": {"creditsRemaining": int, "creditsCharged": int, ...},
                 }
@@ -410,7 +414,9 @@ class InsumerToolSpec(BaseToolSpec):
                             "use": "sig",
                             "alg": "ES256",
                             "kid": "insumer-attest-v1",
-                        }
+                        },
+                        ...  # plus "insumer-attest-v2" and "insumer-trust-v2";
+                             # all share one key, match on your response's kid
                     ]
                 }
         """

@@ -90,7 +90,7 @@ Response shape:
             "expiresAt": "2026-04-16T...",  # +30 min
         },
         "sig": "...",              # ECDSA P-256 signature, base64
-        "kid": "insumer-attest-v1",
+        "kid": "insumer-attest-v2",   # keys minted today; pre-cutover keys return insumer-attest-v1
     },
     "meta": {"creditsRemaining": ..., "creditsCharged": 1, ...},
 }
@@ -138,7 +138,9 @@ jwks = insumer.get_jwks()
 # {
 #     "keys": [
 #         {"kty": "EC", "crv": "P-256", "x": "...", "y": "...",
-#          "use": "sig", "alg": "ES256", "kid": "insumer-attest-v1"}
+#          "use": "sig", "alg": "ES256", "kid": "insumer-attest-v1"},
+#         {..., "kid": "insumer-attest-v2"},   # match on the kid your response carries
+#         {..., "kid": "insumer-trust-v2"}
 #     ]
 # }
 ```
