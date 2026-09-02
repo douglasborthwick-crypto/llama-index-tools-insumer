@@ -95,18 +95,23 @@ Response shape:
             "attestedAt": "2026-04-16T...",
             "expiresAt": "2026-04-16T...",  # +30 min
         },
-        "sig": "...",              # ECDSA P-256 signature, base64
+        "sig": "...",              # ECDSA P-256 signature, base64 P1363
         "kid": "insumer-attest-v2",   # keys minted today; pre-cutover keys return insumer-attest-v1
+        "pqSig": "...",            # ML-DSA-65 post-quantum companion signature, base64
+        "pqKid": "insumer-attest-pq1",
+        "jwt": "...",              # only with format="jwt"; its ML-DSA-65 sibling pqJwt sits beside it
     },
     "meta": {"creditsRemaining": ..., "creditsCharged": 1, ...},
 }
 ```
 
+Since September 2026 every attest and trust response also carries an ML-DSA-65 post-quantum companion signature (`pqSig`, `pqKid`; `pqJwt` beside `jwt`) over the same bytes the classical `kid` selects. It is additive: `sig` and `kid` are unchanged. Trust responses carry `kid: insumer-trust-v2` and `pqKid: insumer-trust-pq1`. [insumer-verify](https://www.npmjs.com/package/insumer-verify) 1.8.0 and later report the companion as a fifth verdict beside signature, condition hashes, freshness, and expiry.
+
 Costs 1 credit per call (2 with `proof="merkle"` for EIP-1186 storage proofs).
 
 ### `get_trust_profile`
 
-Multi-dimensional wallet trust profile — stablecoins, governance, NFTs, staking (plus Solana, XRPL, Bitcoin, Tron, Stellar, Sui when those wallet addresses are supplied). Returns a signed summary showing which dimensions have activity, without exposing raw balances. Up to 49 checks across 27 chains.
+Multi-dimensional wallet trust profile — stablecoins, governance, NFTs, staking, institutional stablecoins (plus Solana, XRPL, Bitcoin, Tron, Stellar, Sui when those wallet addresses are supplied). Returns a signed summary showing which dimensions have activity, without exposing raw balances. 44 base checks across 25 chains in 5 dimensions; up to 49 across 27 chains in 9 dimensions. A check whose chain wallet was not supplied stays in the signed profile with `evaluated: false` and is counted in `notEvaluatedCount`, never as a pass or a fail.
 
 ```python
 insumer.get_trust_profile(
@@ -139,14 +144,21 @@ insumer.attest_wallet(
 
 Fetch the public JWKS used to sign attestation and trust responses. Enables offline verification of any result with a standard JWT/JOSE library. No API key required.
 
+The set holds five entries over two keys: the ECDSA P-256 key under three kids, followed by the ML-DSA-65 post-quantum companion key under two RFC 9964 `AKP` entries (raw key in `pub`). Match on the `kid` or `pqKid` your response carries, never on position; treat an unknown kid as unverifiable. Values below are from the live file:
+
 ```python
 jwks = insumer.get_jwks()
 # {
 #     "keys": [
-#         {"kty": "EC", "crv": "P-256", "x": "...", "y": "...",
+#         {"kty": "EC", "crv": "P-256",
+#          "x": "JtHPhDPnv8AfP0JSlGutxbOlxreV2Chey27Z76q3V2c",
+#          "y": "kn34HaxVSJfn8NxwNEBjjLkcrM_GDw1lgnqyADGuc4c",
 #          "use": "sig", "alg": "ES256", "kid": "insumer-attest-v1"},
-#         {..., "kid": "insumer-attest-v2"},   # match on the kid your response carries
-#         {..., "kid": "insumer-trust-v2"}
+#         {..., "kid": "insumer-attest-v2"},   # same EC key; attest responses on current keys
+#         {..., "kid": "insumer-trust-v2"},    # same EC key; trust responses on current keys
+#         {"kty": "AKP", "alg": "ML-DSA-65", "use": "sig", "kid": "insumer-attest-pq1",
+#          "pub": "lWQSprOGRxWovc9LfqqiQtO6..."},   # 2603-char base64url ML-DSA-65 public key
+#         {..., "kid": "insumer-trust-pq1"}    # same post-quantum key
 #     ]
 # }
 ```

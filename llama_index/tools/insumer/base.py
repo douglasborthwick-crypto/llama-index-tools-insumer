@@ -21,7 +21,7 @@ DEFAULT_TIMEOUT = 30
 class InsumerToolSpec(BaseToolSpec):
     """Tool spec for InsumerAPI.
 
-    Exposes four methods as LlamaIndex tools:
+    Exposes six methods as LlamaIndex tools:
 
     - ``attest_wallet``: run wallet attestation against one or more conditions
       (token balance, NFT ownership, EAS attestation, Farcaster ID) across
@@ -36,9 +36,10 @@ class InsumerToolSpec(BaseToolSpec):
       templates (Coinbase Verified Account, Gitcoin Passport, etc.) usable
       directly in attest_wallet without raw EAS schema IDs. No API key
       required.
-    - ``get_jwks``: fetch the JSON Web Key Set used to verify ECDSA signatures
-      on attestation and trust responses. No API key required. Enables offline
-      verification.
+    - ``get_jwks``: fetch the JSON Web Key Set used to verify signatures on
+      attestation and trust responses: the ECDSA P-256 key under three kids
+      plus the ML-DSA-65 post-quantum companion key under two RFC 9964 AKP
+      entries. No API key required. Enables offline verification.
     - ``buy_api_key``: let an agent purchase its own new API key on-chain with
       USDC, USDT, or BTC, no human in the loop. Wallet address is the
       identity; no email required.
@@ -195,7 +196,8 @@ class InsumerToolSpec(BaseToolSpec):
                 proofs in results. Costs 2 credits instead of 1. Reveals raw
                 balance to the caller.
             format: Set to ``"jwt"`` to include an ES256-signed JWT in the
-                response alongside the boolean result.
+                response alongside the boolean result, with its ML-DSA-65
+                sibling ``pqJwt`` beside it.
 
         Returns:
             API response envelope. On success:
@@ -214,11 +216,16 @@ class InsumerToolSpec(BaseToolSpec):
                             "attestedAt": ISO8601,
                             "expiresAt": ISO8601,
                         },
-                        "sig": str,                # ECDSA P-256, base64
+                        "sig": str,                # ECDSA P-256, base64 P1363
                         "kid": str,                # "insumer-attest-v2" on keys minted
                                                    # today; "insumer-attest-v1" on
                                                    # pre-cutover keys
+                        "pqSig": str,              # ML-DSA-65 post-quantum companion,
+                                                   # base64, carried since September
+                                                   # 2026; additive, sig/kid unchanged
+                        "pqKid": str,              # "insumer-attest-pq1"
                         "jwt": str,                # if format="jwt"
+                        "pqJwt": str,              # if format="jwt": ML-DSA-65 sibling
                     },
                     "meta": {"creditsRemaining": int, "creditsCharged": int, ...},
                 }
@@ -284,9 +291,14 @@ class InsumerToolSpec(BaseToolSpec):
         when those wallet addresses are provided).
 
         Trust profile reports which dimensions show activity. Each dimension
-        runs a curated set of token/NFT balance checks (``balance > 0``).
-        The response includes per-check booleans, a summary, and a signature
-        over the whole payload. 3 credits standard, 6 with proof="merkle".
+        runs a curated set of token/NFT balance checks (``balance > 0``):
+        44 base checks across 25 chains in 5 dimensions, up to 49 across 27
+        chains in 9 dimensions with the optional wallets. A check whose chain
+        wallet was not supplied stays in the signed profile with
+        ``evaluated: False`` and ``reason: "wallet_not_provided"``, counted in
+        ``notEvaluatedCount`` rather than passed or failed. The response
+        includes per-check booleans, a summary, and a signature over the whole
+        payload. 3 credits standard, 6 with proof="merkle".
 
         Args:
             wallet: EVM wallet address to profile (required, 0x + 40 hex).
@@ -317,7 +329,7 @@ class InsumerToolSpec(BaseToolSpec):
                             "wallet": "0x...",
                             "conditionSetVersion": "v1",
                             "dimensions": {
-                                "stablecoins": {"checks": [...], "passCount": int, "failCount": int, "total": int},
+                                "stablecoins": {"checks": [...], "passCount": int, "failCount": int, "notEvaluatedCount": int, "total": int},
                                 "governance": {...},
                                 "nfts": {...},
                                 "staking": {...},
@@ -332,16 +344,21 @@ class InsumerToolSpec(BaseToolSpec):
                                 "totalChecks": int,
                                 "totalPassed": int,
                                 "totalFailed": int,
+                                "totalNotEvaluated": int,   # passed + failed + not evaluated = totalChecks
                                 "dimensionsWithActivity": int,
                                 "dimensionsChecked": int,
                             },
                             "profiledAt": ISO8601,
                             "expiresAt": ISO8601,
                         },
-                        "sig": str,                # ECDSA P-256, base64
+                        "sig": str,                # ECDSA P-256, base64 P1363
                         "kid": str,                # "insumer-trust-v2" on keys minted
                                                    # today; "insumer-attest-v1" on
                                                    # pre-cutover keys
+                        "pqSig": str,              # ML-DSA-65 post-quantum companion,
+                                                   # base64, carried since September
+                                                   # 2026; additive, sig/kid unchanged
+                        "pqKid": str,              # "insumer-trust-pq1"
                     },
                     "meta": {"creditsRemaining": int, "creditsCharged": int, ...},
                 }
@@ -398,13 +415,18 @@ class InsumerToolSpec(BaseToolSpec):
 
     def get_jwks(self) -> Dict[str, Any]:
         """Fetch the public JSON Web Key Set for offline verification of
-        ECDSA signatures on attestation and trust responses.
+        signatures on attestation and trust responses.
 
-        Standard JWKS format. Compatible with any JWT/JOSE library (jose,
-        PyJWT, python-jose, etc.). No API key required.
+        Standard JWKS format, five entries over two keys: the ECDSA P-256 key
+        under three kids, followed by the ML-DSA-65 post-quantum companion key
+        under two RFC 9964 ``AKP`` entries (raw key in ``pub``). Match on the
+        ``kid`` or ``pqKid`` your response carries, never on position; treat
+        an unknown kid as unverifiable. The EC entries work with any JWT/JOSE
+        library (jose, PyJWT, python-jose, etc.); ML-DSA-65 needs a FIPS 204
+        implementation. No API key required.
 
         Returns:
-            JWKS response:
+            JWKS response (values from the live file):
 
             .. code-block:: python
 
@@ -413,14 +435,22 @@ class InsumerToolSpec(BaseToolSpec):
                         {
                             "kty": "EC",
                             "crv": "P-256",
-                            "x": "...",
-                            "y": "...",
+                            "x": "JtHPhDPnv8AfP0JSlGutxbOlxreV2Chey27Z76q3V2c",
+                            "y": "kn34HaxVSJfn8NxwNEBjjLkcrM_GDw1lgnqyADGuc4c",
                             "use": "sig",
                             "alg": "ES256",
                             "kid": "insumer-attest-v1",
                         },
-                        ...  # plus "insumer-attest-v2" and "insumer-trust-v2";
-                             # all share one key, match on your response's kid
+                        {..., "kid": "insumer-attest-v2"},  # same EC key; attest on current keys
+                        {..., "kid": "insumer-trust-v2"},   # same EC key; trust on current keys
+                        {
+                            "kty": "AKP",
+                            "alg": "ML-DSA-65",
+                            "use": "sig",
+                            "kid": "insumer-attest-pq1",
+                            "pub": "lWQSprOGRxWovc9LfqqiQtO6...",  # 2603-char base64url key
+                        },
+                        {..., "kid": "insumer-trust-pq1"},  # same post-quantum key
                     ]
                 }
         """
